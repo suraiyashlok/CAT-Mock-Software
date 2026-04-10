@@ -1,0 +1,95 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // ===============================================================
+    // Assumed Data Model
+    // ===============================================================
+    //
+    // Collection: users
+    // Document ID: {userId}
+    // Fields:
+    //   - uid: string (required)
+    //   - email: string (required, email format)
+    //   - displayName: string (optional)
+    //   - createdAt: string (required, date-time)
+    //
+    // Collection: papers
+    // Document ID: {paperId}
+    // Fields:
+    //   - id: string (required)
+    //   - title: string (required)
+    //   - createdBy: string (required, userId)
+    //   - createdAt: string (required, date-time)
+    //   - sections: array (required)
+    //
+    // Collection: attempts
+    // Document ID: {attemptId}
+    // Fields:
+    //   - id: string (required)
+    //   - paperId: string (required)
+    //   - userId: string (required)
+    //   - startedAt: string (required, date-time)
+    //   - completedAt: string (optional, date-time)
+    //   - status: string (required, IN_PROGRESS/COMPLETED)
+    //   - responses: map (required)
+    //   - score: number (optional)
+    //   - analysis: map (optional)
+    //
+    // ===============================================================
+
+    // ===============================================================
+    // Helper Functions
+    // ===============================================================
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    function isDocOwner() {
+      return isAuthenticated() && request.auth.uid == resource.data.userId;
+    }
+
+    function isValidEmail(email) {
+      return email is string && email.matches("^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$");
+    }
+
+    function hasOnlyAllowedFields(fields) {
+      return request.resource.data.keys().hasOnly(fields);
+    }
+
+    // ===============================================================
+    // Rules
+    // ===============================================================
+
+    match /users/{userId} {
+      allow read: if isOwner(userId);
+      allow create: if isOwner(userId) && 
+                      request.resource.data.uid == userId &&
+                      isValidEmail(request.resource.data.email);
+      allow update: if isOwner(userId) && 
+                      request.resource.data.uid == userId;
+    }
+
+    match /papers/{paperId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated() && 
+                      request.resource.data.createdBy == request.auth.uid;
+      allow update: if isAuthenticated() && 
+                      resource.data.createdBy == request.auth.uid;
+      allow delete: if isAuthenticated() && 
+                      resource.data.createdBy == request.auth.uid;
+    }
+
+    match /attempts/{attemptId} {
+      allow read: if isAuthenticated() && 
+                    (resource.data.userId == request.auth.uid);
+      allow create: if isAuthenticated() && 
+                      request.resource.data.userId == request.auth.uid;
+      allow update: if isAuthenticated() && 
+                      resource.data.userId == request.auth.uid;
+    }
+  }
+}

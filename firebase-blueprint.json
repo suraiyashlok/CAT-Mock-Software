@@ -1,0 +1,102 @@
+{
+  "entities": {
+    "User": {
+      "title": "User",
+      "description": "User profile information",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string" },
+        "email": { "type": "string", "format": "email" },
+        "displayName": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["uid", "email"]
+    },
+    "Paper": {
+      "title": "Paper",
+      "description": "A processed exam paper",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "title": { "type": "string" },
+        "createdBy": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "sections": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "name": { "type": "string" },
+              "duration": { "type": "number", "description": "Duration in minutes" },
+              "questions": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "id": { "type": "string" },
+                    "text": { "type": "string" },
+                    "options": { "type": "array", "items": { "type": "string" } },
+                    "correctAnswer": { "type": "string" },
+                    "passageId": { "type": "string", "description": "Optional ID of the passage this question belongs to" },
+                    "type": { "type": "string", "enum": ["MCQ", "TITA"] }
+                  }
+                }
+              },
+              "passages": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "id": { "type": "string" },
+                    "content": { "type": "string" }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "Attempt": {
+      "title": "Attempt",
+      "description": "A user's attempt at a paper",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "paperId": { "type": "string" },
+        "userId": { "type": "string" },
+        "startedAt": { "type": "string", "format": "date-time" },
+        "completedAt": { "type": "string", "format": "date-time" },
+        "status": { "type": "string", "enum": ["IN_PROGRESS", "COMPLETED"] },
+        "responses": {
+          "type": "object",
+          "description": "Map of questionId to response data",
+          "additionalProperties": {
+            "type": "object",
+            "properties": {
+              "answer": { "type": "string" },
+              "timeSpent": { "type": "number", "description": "Time spent in seconds" },
+              "status": { "type": "string", "enum": ["NOT_VISITED", "NOT_ANSWERED", "ANSWERED", "MARKED_FOR_REVIEW", "ANSWERED_AND_MARKED_FOR_REVIEW"] }
+            }
+          }
+        },
+        "score": { "type": "number" },
+        "analysis": { "type": "object" }
+      }
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "User",
+      "description": "User profile data"
+    },
+    "/papers/{paperId}": {
+      "schema": "Paper",
+      "description": "Exam paper data"
+    },
+    "/attempts/{attemptId}": {
+      "schema": "Attempt",
+      "description": "User exam attempts"
+    }
+  }
+}
