@@ -10,12 +10,15 @@ import * as pdfjsLib from 'pdfjs-dist';
 // Configure PDF.js worker
 pdfjsLib.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@${pdfjsLib.version}/build/pdf.worker.min.mjs`;
 
+import { User } from 'firebase/auth';
+
 interface DashboardProps {
+  user: User;
   onStartExam: (paper: Paper) => void;
   onReviewAttempt: (paper: Paper, attempt: Attempt) => void;
 }
 
-export default function Dashboard({ onStartExam, onReviewAttempt }: DashboardProps) {
+export default function Dashboard({ user, onStartExam, onReviewAttempt }: DashboardProps) {
   const [papers, setPapers] = useState<Paper[]>([]);
   const [attempts, setAttempts] = useState<Attempt[]>([]);
   const [isUploading, setIsUploading] = useState(false);
@@ -33,17 +36,17 @@ export default function Dashboard({ onStartExam, onReviewAttempt }: DashboardPro
       const papersList = papersSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Paper));
       setPapers(papersList);
 
-      if (auth.currentUser) {
+      if (user) {
         const attemptsQuery = query(
           collection(db, 'attempts'),
-          where('userId', '==', auth.currentUser.uid),
+          where('userId', '==', user.uid),
           orderBy('startedAt', 'desc')
         );
         const attemptsSnap = await getDocs(attemptsQuery);
         setAttempts(attemptsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Attempt)));
       }
     } catch (err) {
-      console.error(err);
+      handleFirestoreError(err, OperationType.LIST, 'papers', user?.uid);
     }
   };
 
@@ -82,7 +85,7 @@ export default function Dashboard({ onStartExam, onReviewAttempt }: DashboardPro
       
       const paperData = {
         ...parsedPaper,
-        createdBy: auth.currentUser?.uid,
+        createdBy: user?.uid,
         createdAt: new Date().toISOString(),
       };
 
@@ -91,7 +94,7 @@ export default function Dashboard({ onStartExam, onReviewAttempt }: DashboardPro
       setShowUploadModal(false);
       setUploadStep('FILES');
     } catch (err) {
-      console.error(err);
+      handleFirestoreError(err, OperationType.CREATE, 'papers', user?.uid);
       setError("Failed to process paper. Please ensure the PDF is readable.");
     } finally {
       setIsUploading(false);

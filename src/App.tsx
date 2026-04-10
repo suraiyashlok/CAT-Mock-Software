@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { auth, db, handleFirestoreError, OperationType } from './firebase';
-import { onAuthStateChanged, signInWithPopup, GoogleAuthProvider, User } from 'firebase/auth';
+import { onAuthStateChanged, signInWithPopup, GoogleAuthProvider, User, signInAnonymously } from 'firebase/auth';
 import { doc, setDoc, getDoc, addDoc, collection } from 'firebase/firestore';
 import { Paper, Attempt, QuestionResponse } from './types';
 import Dashboard from './components/Dashboard';
@@ -28,14 +28,21 @@ export default function App() {
         if (!userSnap.exists()) {
           await setDoc(userRef, {
             uid: user.uid,
-            email: user.email,
-            displayName: user.displayName,
+            email: user.email || 'guest@example.com',
+            displayName: user.displayName || 'Guest User',
             createdAt: new Date().toISOString()
           });
         }
         setUser(user);
       } else {
-        setUser(null);
+        // Automatically sign in anonymously if no user
+        try {
+          await signInAnonymously(auth);
+        } catch (err) {
+          console.error("Anonymous auth failed:", err);
+          // Fallback to a mock user if anonymous auth is not enabled in console
+          setUser({ uid: 'guest-user', email: 'guest@example.com', displayName: 'Guest User' } as any);
+        }
       }
       setLoading(false);
     });
@@ -100,7 +107,7 @@ export default function App() {
       setActiveAttempt(fullAttempt);
       setView('REVIEW');
     } catch (err) {
-      handleFirestoreError(err, OperationType.CREATE, 'attempts');
+      handleFirestoreError(err, OperationType.CREATE, 'attempts', user.uid);
     }
   };
 
@@ -118,29 +125,10 @@ export default function App() {
     );
   }
 
-  if (!user) {
+  if (!user && !loading) {
     return (
-      <div className="h-screen flex flex-col items-center justify-center bg-gray-50 p-6">
-        <motion.div
-          initial={{ opacity: 0, scale: 0.9 }}
-          animate={{ opacity: 1, scale: 1 }}
-          className="bg-white p-12 rounded-[2.5rem] shadow-2xl shadow-blue-100 text-center max-w-md w-full border border-gray-100"
-        >
-          <div className="w-20 h-20 bg-blue-600 rounded-3xl flex items-center justify-center text-white mx-auto mb-8 rotate-3 shadow-xl shadow-blue-200">
-            <BarChart3 className="w-10 h-10" />
-          </div>
-          <h1 className="text-3xl font-black text-gray-900 mb-4 tracking-tight">CAT Prep Master</h1>
-          <p className="text-gray-500 font-medium mb-10 leading-relaxed">
-            The ultimate platform for CAT aspirants. Analyze your performance with question-wise time tracking and detailed insights.
-          </p>
-          <button
-            onClick={handleLogin}
-            className="w-full bg-gray-900 hover:bg-black text-white py-4 rounded-2xl font-bold flex items-center justify-center gap-3 transition-all shadow-lg hover:-translate-y-1"
-          >
-            <LogIn className="w-5 h-5" />
-            Sign in with Google
-          </button>
-        </motion.div>
+      <div className="h-screen flex items-center justify-center bg-gray-50">
+        <Loader2 className="w-12 h-12 text-blue-600 animate-spin" />
       </div>
     );
   }
@@ -155,7 +143,7 @@ export default function App() {
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
           >
-            <Dashboard onStartExam={handleStartExam} onReviewAttempt={handleReviewAttempt} />
+            <Dashboard user={user} onStartExam={handleStartExam} onReviewAttempt={handleReviewAttempt} />
           </motion.div>
         )}
 
